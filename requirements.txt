@@ -1,0 +1,6 @@
+crewai
+groq
+langchain-groq
+python-dotenv
+imaplib
+bcrypt
