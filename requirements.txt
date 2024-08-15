@@ -3,3 +3,4 @@ groq
 langchain-groq
 python-dotenv
 bcrypt
+streamlit-option-menu
