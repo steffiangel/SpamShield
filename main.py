@@ -70,17 +70,24 @@ def fetch_latest_emails(username, password, num_emails=5):
 
 def classify_email(subject, from_, date_, body, attachments):
     template = """
-    As an expert in email analysis, classify the following email based on its content. 
-    Determine if it is spam or not and if it is a phishing attempt or not. Additionally, perform sentiment analysis.
-    Also, provide a brief summary of what this email is about.
+As an expert in email analysis, classify the following email based on its content. Provide the results in a table format with the following structure:
 
-    Email details:
-    Subject: {subject}
-    From: {from_}
-    Date: {date_}
-    Body: {body}
-    Attachments: {attachments}
-    """
+| Category            | Classification  | Score   | Reason                                                                                             |
+|---------------------|------------------|---------|----------------------------------------------------------------------------------------------------|
+| Spam Classification | [Spam/Not Spam]  | [Spam Score]  | [Provide the reason for the classification]                                                        |
+| Phishing Attempt    | [Phishing/Not Phishing] | [Phishing Score]  | [Provide the reason for the classification]                                                        |
+| Sentiment Analysis  | [Positive/Negative/Neutral] | [N/A]  | [Provide the reason for the sentiment classification]                                               |
+
+In addition to the table, provide a brief summary of the email content separately.
+
+Here are the details of the email to classify:
+
+- **Subject:** {subject}
+- **From:** {from_}
+- **Date:** {date_}
+- **Body:** {body}
+- **Attachments:** {attachments}
+"""
     prompt = PromptTemplate.from_template(template=template)
     chain = prompt | model | parser
 
@@ -94,6 +101,11 @@ def classify_email(subject, from_, date_, body, attachments):
 
     result = chain.invoke(email_content)
     return result
+
+def format_email_result(result):
+    # Check if the result indicates spam
+    spam_classification = "Spam Classification" in result
+    return "Spam" if spam_classification else "Not Spam"
 
 # Streamlit
 # Placeholder for session state
@@ -110,20 +122,20 @@ def get_img_as_base64(file):
         data = f.read()
     return base64.b64encode(data).decode()
 
-img = get_img_as_base64("images\login.jpg")
+login_img_base64 = get_img_as_base64("login.jpg")
+background_img_base64 = get_img_as_base64("login.jpg")
 
 page_bg_img = f"""
 <style>
 [data-testid="stAppViewContainer"] > .main {{
-background-image: url("https://img.freepik.com/free-vector/gradient-connection-background_23-2150441893.jpg?t=st=1722228269~exp=1722231869~hmac=5631f59bf1b38d9e05f63b43d0c12d7aaddc276f0199e3aa1bce22ba6f05337e&w=996");
+background-image: url("data:image/jpeg;base64,{background_img_base64}");
 background-size: 100%;
 background-repeat: no-repeat;
 background-position: right;
-
 }}
 
 [data-testid="stSidebar"] > div:first-child {{
-background-image: url("data:image/png;base64,{img}");
+background-image: url("data:image/jpeg;base64,{login_img_base64}");
 background-position: center; 
 background-repeat: no-repeat;
 background-attachment: fixed;
@@ -162,7 +174,7 @@ def login_page():
             st.error("Invalid username or password")
 
 def homepage():
-    st.title("Smart Email Classifier")
+    st.title("SpamShield")
     
     if st.session_state.authenticated:
         num_emails_option = st.selectbox("Number of emails to fetch:", options=[5, 10, 50, 100, "All"])
@@ -192,6 +204,9 @@ def homepage():
                 
                 classification_result = classify_email(subject, from_, date_, body, attachments)
                 
+                # Determine if the email is spam
+                is_spam = format_email_result(classification_result)
+                
                 # Save to history
                 st.session_state.user_history.append({
                     "datetime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -210,7 +225,13 @@ def homepage():
                 with st.expander("More..."):
                     st.write(f"**Body:** {body}")
                 st.write(f"**Attachments:** {', '.join(attachments) if attachments else 'None'}")
-                st.write("**Classification Result**")
+                
+                # Highlight spam emails in red
+                if is_spam == "Spam":
+                    st.markdown('<div style="color: white;"><h3>Classification Result</h3></div>', unsafe_allow_html=True)
+                else:
+                    st.write("**Classification Result**")
+                    
                 st.write(classification_result)
     else:
         st.error("Please log in to fetch and classify emails.")
@@ -240,8 +261,25 @@ def history_page():
         st.error("Please log in to view your history.")
 
 def about_us_page():
-    st.title("About Us")
-    st.write("This app was developed to help users classify and analyze their emails efficiently. This app classifies whether an email is spam or not, and whether it is a phishing attack. It also performs sentiment analysis and provides a summary of the email content")
+    st.title("SpamShield")
+    st.write("""
+# Welcome to SpamShield
+
+Our innovative app is designed to enhance your email experience by keeping your inbox safe and organized. It seamlessly integrates with Gmail to classify your emails into categories such as **Spam**, **Phishing**, and provides **Sentiment Analysis**. Additionally, it offers a concise summary of each email, ensuring you stay informed and protected.
+
+## Meet the Team
+- **Aleena Varghese**
+- **Samson Sabu**
+- **Steffi Angel**
+
+## Our Mission
+
+We aim to provide a reliable tool that helps you manage your emails effortlessly, protect your personal information, and gain valuable insights into the nature of your communications. We are committed to leveraging cutting-edge technology to improve your digital experience.
+
+Thank you for choosing our app. We hope it makes your email management simpler and more secure.
+
+For any inquiries or feedback, feel free to reach out to us.
+""")
 
 def main():
     selected = option_menu(
@@ -257,10 +295,6 @@ def main():
         "nav-link-selected": {"background-color": "blue"},
         },
     )
-
-    # Sidebar for navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("", ["Home", "Login", "Profile", "History", "About Us"])
 
     if selected == "Login":
         login_page()
